@@ -14,10 +14,13 @@
 #include <dirent.h>
 
 #include "helpers.h"
-#define PARAM_ACCESS_SEMAPHORE "/param_access_semaphore001"
 
 char* paths[100]; //for storing the accessing paths of the text files
 int num = 0; //the number of text files in the directory
+#define SHM_SIZE 1048576 // 1MB
+
+#define PARAM_ACCESS_SEMAPHORE1 "/param_access_semaphore1" //parent semaphore
+#define PARAM_ACCESS_SEMAPHORE2 "/param_access_semaphore2" //child semaphore
 
 /**
  * @brief This function recursively traverse the source directory.
@@ -38,41 +41,58 @@ int main(int argc, char **argv) {
 		exit(-1);
 	}
 
+	// Checks if the semaphore exists, if it exists we unlink him from the process.
+	sem_unlink(PARAM_ACCESS_SEMAPHORE1);
+	sem_unlink(PARAM_ACCESS_SEMAPHORE2);
+	
+	// Create the semaphore. sem_init() also creates a semaphore. Learn the difference on your own.
+	sem_t *param_access_semaphore1 = sem_open(PARAM_ACCESS_SEMAPHORE1, O_CREAT|O_EXCL, S_IRUSR|S_IWUSR, 1);
+	sem_t *param_access_semaphore2 = sem_open(PARAM_ACCESS_SEMAPHORE2, O_CREAT|O_EXCL, S_IRUSR|S_IWUSR, 0);
+
+	// Check for error while opening the semaphore
+	if (param_access_semaphore1 != SEM_FAILED){
+		printf("Successfully created new semaphore!\n");
+	}	
+	else if (errno == EEXIST) {   // Semaphore already exists
+		printf("Semaphore appears to exist already!\n");
+		param_access_semaphore1 = sem_open(PARAM_ACCESS_SEMAPHORE1, 0);
+	}
+	else {  // An other error occured
+		assert(param_access_semaphore1 != SEM_FAILED);
+		exit(-1);
+	}
+
+	if (param_access_semaphore2 != SEM_FAILED){
+		printf("Successfully created new semaphore!\n");
+	}	
+	else if (errno == EEXIST) {   // Semaphore already exists
+		printf("Semaphore appears to exist already!\n");
+		param_access_semaphore1 = sem_open(PARAM_ACCESS_SEMAPHORE2, 0);
+	}
+	else {  // An other error occured
+		assert(param_access_semaphore2 != SEM_FAILED);
+		exit(-1);
+	}
+
 	traverseDir(dir_name);
 
-	printf("\n\n\n\n");
-	for (int i = 0; i < num; i++) {
-		printf("%s \n", paths[i]);
-	}
+	// printf("\n\n\n\n");
+	// for (int i = 0; i < num; i++) {
+	// 	printf("%s \n", paths[i]);
+	// }
 
     /////////////////////////////////////////////////
     // You can add some code here to prepare before fork.
     /////////////////////////////////////////////////
-    int shmid, status;
-	// char *shared_param_p, *shared_param_c;
+    int shmid;
+	char *shared_param_p, *shared_param_c;
 	int totalWord=0;
 
-
-	sem_unlink(PARAM_ACCESS_SEMAPHORE);
-	// Create the semaphore. sem_init() also creates a semaphore. Learn the difference on your own.
-  	sem_t * param_access_semaphore = sem_open(PARAM_ACCESS_SEMAPHORE, O_CREAT | O_EXCL, S_IRUSR | S_IWUSR, 1);
-
-	  // Check for error while opening the semaphore
-	if (param_access_semaphore != SEM_FAILED) {
-		printf("Successfully created new semaphore!\n");
-	} else if (errno == EEXIST) { // Semaphore already exists
-		printf("Semaphore appears to exist already!\n");
-		param_access_semaphore = sem_open(PARAM_ACCESS_SEMAPHORE, 0);
-	} else { // An other error occured
-		assert(param_access_semaphore != SEM_FAILED);
-		exit(-1);
-	}
-    shmid = shmget(IPC_PRIVATE, 1024*1024, 0666|IPC_CREAT);
-    
+    shmid = shmget(IPC_PRIVATE, SHM_SIZE, 0666|IPC_CREAT);
     
 	switch (process_id = fork()) {
-
-	default:
+		
+        default:
 		/*
 			Parent Process
 		*/
@@ -81,23 +101,77 @@ int main(int argc, char **argv) {
         /////////////////////////////////////////////////
         // Implement your code for parent process here.
         /////////////////////////////////////////////////
-		sem_wait(param_access_semaphore);
-        char * shared_param_p = (char *)shmat(shmid, NULL, 0);
+		
+        shared_param_p = (char *)shmat(shmid, NULL, 0);
+        for (size_t i = 0; i < num; i++) {
 
-        int i = 0;
-        // while(s[i] != NULL){
-            // Open file for reading
-            FILE * fp = fopen(paths[i++], "r");
+            // Wait for permission to access shared memory
+            sem_wait(param_access_semaphore1);
+            // Open the input file
+            FILE* fp = fopen(paths[i], "r");
+            // Get the size of the file, why minus 1 detail refer to helper.c
+            size_t fileSize = fileLength(fp);
+            // Initialize variables for tracking the last two spaces
+            size_t lastspace = -1;
+            // Initialize pointer for writing to shared memory
+            int temppointer = 0;
+            // Loop over the file contents
+            for (long i = 0; i < fileSize; i++) {
+                // Read the next character from the file
+                char c = (char)fgetc(fp);
+                // Check if the character is a space or a newline
+                if (c == ' ' || c == '\n') {
+                // Update the position of the last spaces
+                lastspace = temppointer;
+                }
+                // Write the character to shared memory
+                shared_param_p[temppointer] = c;
+                // If the shared memory segment is full, check if the last character written was neither a space nor a newline
+                if (temppointer == SHM_SIZE-1) {
+					printf("exceed the size");
+                    if (c != ' ' || c != '\n') {
+                        // Replace the second last space with a dummy char
+                        shared_param_p[lastspace] = 'A';
+						// Add a null character in the end of shared memory
+						shared_param_p[temppointer] = '\0';
+                    }
+                    // Reset the pointer and signal that the shared memory segment is ready for reading
+                    temppointer = 0;
+                    sem_post(param_access_semaphore2);
+                    sem_wait(param_access_semaphore1);
+                }
+            }
+			// Add a null character in the end of shared memory
+			shared_param_p[(fileSize%SHM_SIZE)-1] = '\0';
+			printf("last round");
+            // Close the input file
+            fclose(fp);
+            // Signal that the current file is done being processed
+            sem_post(param_access_semaphore2);
 
-            // size_t bytes_read = 0;
-            // bytes_read += fread(shared_param_p, sizeof(char), min(SHM_SIZE,filelen()), fp);
-            fread(shared_param_p, sizeof(char), fileLength(fp), fp);
-			// size_t num_bytes = filelen() * sizeof(char);
+        }
 
-        // }
-		sem_post(param_access_semaphore);
+		for (int i = 0; i < num; i++) {
+			free(paths[i]);
+		}
 
+		// FILE* fp = fopen(paths[0], "r");
+		// size_t bytes_read = 0;
+		// bytes_read += fread(shared_param_p, sizeof(char), fileLength(fp), fp);
+		// printf("file %s:   %s bytes\n", paths[0], shared_param_p);
+		
+		wait(NULL);
+     	printf("bug free.\n");
 		printf("Parent process: Finished.\n");
+
+		shmdt(shared_param_p);
+		shmctl(shmid, IPC_RMID, 0);
+
+		sem_close(param_access_semaphore1);
+        sem_unlink(PARAM_ACCESS_SEMAPHORE1);
+		sem_close(param_access_semaphore2);
+        sem_unlink(PARAM_ACCESS_SEMAPHORE2);
+		exit(0);
 		break;
 
 	case 0:
@@ -110,19 +184,26 @@ int main(int argc, char **argv) {
         /////////////////////////////////////////////////
         // Implement your code for child process here.
         /////////////////////////////////////////////////
-
-		int count = 0;
-		char fileName[13] = "p2_result.txt";
-
-		sem_wait(param_access_semaphore);
-
         char * shared_param_c = (char *)shmat(shmid, NULL, 0);
-		count += wordCount(shared_param_c);
 
-		printf("\n count number=%d \n\n",count);
-		saveResult(fileName,count);
-		sem_post(param_access_semaphore);
+		for (int i = 0; i < num; i++) {
+			sem_wait(param_access_semaphore2);
+			//long word = wordCount(shared_param_c);
+			//printf("file %s has %ld words", paths[i], word);
+			totalWord += wordCount(shared_param_c);
+			sem_post(param_access_semaphore1);
+		}
+
+		saveResult("p2_result.txt", totalWord);
+		
+		// totalWord += wordCount(shared_param_c);
+		// printf("word count is: %d", totalWord);
+		// saveResult("p2_result.txt", totalWord);
+
+		printf("word count is: %d\n", totalWord);
 		printf("Child process: Finished.\n");
+
+		shmdt(shared_param_c);
 		exit(0);
 
 	case -1:
