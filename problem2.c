@@ -121,8 +121,8 @@ int main(int argc, char **argv) {
                 char c = (char)fgetc(fp);
                 // Check if the character is a space or a newline
                 if (c == ' ' || c == '\n') {
-                // Update the position of the last spaces
-                lastspace = temppointer;
+                	// Update the position of the last spaces
+                	lastspace = temppointer;
                 }
                 // Write the character to shared memory
                 shared_param_p[temppointer] = c;
