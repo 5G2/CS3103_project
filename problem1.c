@@ -26,7 +26,7 @@
 
 #include "helpers.h"
 
-#define PARAM_ACCESS_SEMAPHORE "/param_access_semaphore1"
+#define PARAM_ACCESS_SEMAPHORE "/PARAM_ACCESS_SEMAPHORE11"
 
 long int global_param = 0;
 sem_t sem_array[8];
@@ -223,11 +223,10 @@ void * child(void * arg) {
 }
 
 void multi_threads_run(long int input_param) {
-  // Add your code here
   printf("argv 2 in multi %ld\n", times);
   //Declare variables
   pthread_t thread[8];
-  //convert input_param to array
+  //convert input_param to array to allow the thread to access one digit at a time
   for (int i = 7; i >= 0; i--) {
     arr[i] = input_param % 10;
     input_param /= 10;
@@ -241,6 +240,7 @@ void multi_threads_run(long int input_param) {
     }
   }
 
+  //create 8 thread to do the calculation
   for (int i = 0; i < 8; i++) {
     pthread_create( & thread[i], NULL, child, indexes + i);
   }
@@ -248,6 +248,8 @@ void multi_threads_run(long int input_param) {
   for (int i = 0; i < 8; i++) {
     pthread_join(thread[i], NULL);
   }
+
+  //for debugging use, to check to if result is correct
   printf("Array after all threads finish:\n");
   for (int i = 0; i < 8; i++) {
     printf("%d ", arr[i]);
