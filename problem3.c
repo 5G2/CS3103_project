@@ -47,13 +47,25 @@ void *threadFunc(void *arg)
 
 	char *thread_array = (char *)malloc(segment_length);
 	memcpy(thread_array, data->segment_ptrs, segment_length);
+	size_t thread_array_length = strlen(thread_array);
+	printf("Length of thread_array: %zu\n", thread_array_length);
+	if (thread_array_length == 262144)
+	{
+		char c = thread_array[262143];
+		if (c != '\0' || c != ' ' || c != '\n')
+		{
+			data->result = -1;
+		}
+	}
 
-	// printf("this is process %d   ", data->threadid);
 	if (thread_array[0] != '\0')
 	{
 		data->result += wordCount(thread_array);
+		if (data->result >= 262143)
+		{
+		}
 	}
-	// printf("word count %d\n", data->result);
+	printf("this is process %d   \nword count %d\n", data->threadid, data->result);
 
 	free(thread_array);
 
@@ -151,6 +163,7 @@ int main(int argc, char **argv)
 		/////////////////////////////////////////////////
 
 		shared_param_p = (char *)shmat(shmid, NULL, 0);
+		//memset(shared_param_p, '\0', SHM_SIZE);
 		for (size_t i = 0; i < num; i++)
 		{
 
@@ -257,13 +270,28 @@ int main(int argc, char **argv)
 		pthread_t threads[4];
 		for (long i = 0; i < looptime; i++)
 		{
-			// printf("loop for file %lu\n", i);
+			printf("loop for file %lu\n", i);
 			sem_wait(param_access_semaphore2);
 
 			// printf("this is orignal pointer%s\n", shared_param_c);
 			// for (int i = 0; i < 4; i++)
 			// {
 			// 	printf("this is %d pointer%s\n", i, thread_data_array[i].segment_ptrs);
+			// }
+
+			// for (int i = 0; i < 4; i++)
+			// {
+			// 	char c = *(thread_data_array[i].segment_ptrs + segment_length);
+			// 	printf("\nThe ASCII Value of %c is %d", c, c);
+			// 	if (c != '\0' || c != ' ' || c != '\n')
+			// 	{
+			// 		thread_data_array[i].result = -1;
+			// 	}
+			// 	else
+			// 	{
+			// 		thread_data_array[i].result = 1;
+			// 	}
+			// 	printf("this is the result init vlaue of %d is %d\n", i, thread_data_array[i].result);
 			// }
 
 			for (int i = 0; i < 4; i++)
