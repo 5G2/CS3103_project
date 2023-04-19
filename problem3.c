@@ -63,6 +63,7 @@ void *threadFunc(void *arg)
 		data->result += wordCount(thread_array);
 		if (data->result >= 262143)
 		{
+			data->result = -1;
 		}
 	}
 	printf("this is process %d   \nword count %d\n", data->threadid, data->result);
