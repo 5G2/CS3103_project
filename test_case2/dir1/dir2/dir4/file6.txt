@@ -1,0 +1,1 @@
+On a typical Linux distribution with the PREEMPT_RT patch, there should not be RT tasks running on the system except for a few built-in kernel tasks.

@@ -1,0 +1,1 @@
+When writing a RT application, the application must let the operating system (OS) know that it needs real-time capabilities by setting configurations such as the process scheduling policy and priority. This must be done through an OS-level API, as the application and OS must cooperate to achieve such low latency values.

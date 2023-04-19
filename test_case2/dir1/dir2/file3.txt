@@ -1,0 +1,1 @@
+In addition to configuring the thread with an RT scheduling policy, we also need to give it an RT priority level.

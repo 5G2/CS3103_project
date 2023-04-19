@@ -1,0 +1,1 @@
+These are necessary for communication with the hardware and should generally not be changed.

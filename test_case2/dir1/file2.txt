@@ -1,0 +1,1 @@
+By default, threads created on Linux are scheduled with a non-RT scheduler. The non-RT scheduler is not optimized for latency and thus cannot generally be used to satisfy RT constraints.

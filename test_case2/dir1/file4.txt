@@ -1,0 +1,1 @@
+To setup an RT thread, we need to inform the OS to schedule the thread with a RT scheduling policy.

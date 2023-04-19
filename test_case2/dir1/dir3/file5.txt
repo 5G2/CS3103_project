@@ -1,0 +1,1 @@
+If two threads are runnable, the higher-priority thread will run, even if it means preempting the lower-priority thread in the process.
